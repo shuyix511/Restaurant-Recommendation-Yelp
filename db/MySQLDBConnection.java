@@ -30,6 +30,7 @@ import yelp.YelpAPI;
 public class MySQLDBConnection implements DBConnection {
 	// May ask for implementation of other methods. Just add empty body to them.
 	private Connection conn;
+	private static final int MAX_RECOMMENDED_RESTAURANTS = 20;
 
 	public MySQLDBConnection() {
 		try {
@@ -158,26 +159,101 @@ public class MySQLDBConnection implements DBConnection {
 
 	@Override
 	public JSONObject getRestaurantsById(String businessId, boolean isVisited) {
-		// TODO Auto-generated method stub
-		return null;
+		try {
+        	String sql = "SELECT * from "
+                	+ "restaurants where business_id='" + businessId + "'" + " ORDER BY stars DESC";
+        	ResultSet rs = executeFetchStatement(sql);
+        	if (rs.next()) {
+            	Restaurant restaurant = new Restaurant(
+                    	rs.getString("business_id"),
+                    	rs.getString("name"),
+                    	rs.getString("categories"),
+                    	rs.getString("city"),
+                    	rs.getString("state"),
+                    	rs.getString("full_address"),
+                    	rs.getFloat("stars"),
+                    	rs.getFloat("latitude"),
+                    	rs.getFloat("longitude"),
+                    	rs.getString("image_url"),
+                    	rs.getString("url"));
+            	JSONObject obj = restaurant.toJSONObject();
+            	obj.put("is_visited", isVisited);
+            	return obj;
+        	}
+    	} catch (Exception e) { /* report an error */
+        	System.out.println(e.getMessage());
+    	}
+    	return null;
 	}
 
 	@Override
 	public JSONArray recommendRestaurants(String userId) {
-		// TODO Auto-generated method stub
+		try {
+			Set<String> visitedRestaurants = getVisitedRestaurants(userId);
+			Set<String> allCategories = new HashSet<>();// why hashSet?
+			for (String restaurant : visitedRestaurants) {
+				allCategories.addAll(getCategories(restaurant));
+			}
+			Set<String> allRestaurants = new HashSet<>();
+			for (String category : allCategories) {
+				Set<String> set = getBusinessId(category);
+				allRestaurants.addAll(set);
+			}
+			Set<JSONObject> diff = new HashSet<>();
+			int count = 0;
+			for (String businessId : allRestaurants) {
+				// Perform filtering
+				if (!visitedRestaurants.contains(businessId)) {
+					diff.add(getRestaurantsById(businessId, false));
+					count++;
+					if (count >= MAX_RECOMMENDED_RESTAURANTS) {
+						break;
+					}
+				}
+			}
+			return new JSONArray(diff);
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+		}
 		return null;
 	}
 
 	@Override
 	public Set<String> getCategories(String businessId) {
-		// TODO Auto-generated method stub
-		return null;
+		Set<String> set = new HashSet<>();
+		try {
+			String sql = "SELECT categories from restaurants WHERE business_id='" + businessId + "'";
+			ResultSet rs = executeFetchStatement(sql);
+			if (rs.next()) {
+				
+				String[] categories = rs.getString("categories").split(",");
+				for (String category : categories) {
+					// ' Japanese ' -> 'Japanese'
+					set.add(category.trim());
+				}
+				return set;
+			}
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+		}
+		return set;
 	}
 
 	@Override
 	public Set<String> getBusinessId(String category) {
-		// TODO Auto-generated method stub
-		return null;
+		Set<String> set = new HashSet<>();
+		try {
+			String sql = "SELECT business_id from restaurants WHERE categories LIKE '%" + category + "%'";
+			ResultSet rs = executeFetchStatement(sql);
+			while (rs.next()) {
+				String id = rs.getString("business_id");
+				set.add(id);
+			}
+			return set;
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+		}
+		return set;
 	}
 
 	@Override
