@@ -14,7 +14,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import db.DBConnection;
+import db.MongoDBConnection;
 import db.MySQLDBConnection;
+import db.MongoDBConnection;
 
 /**
  * Servlet implementation class SearchRestaurants
